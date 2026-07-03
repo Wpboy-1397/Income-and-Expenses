@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<script src="https://gstatic.com"></script>
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<style>
+:root { --primary: #1a237e; --success: #2e7d32; --danger: #c62828; --bg: #f0f2f5; --edit: #0288d1;}
+body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding-top: 80px; padding-bottom: 20px; color: #333; }
+.container { max-width: 550px; margin: auto; padding: 10px; box-sizing: border-box; }
+.nav { position: fixed; top: 0; left: 0; right: 0; background: var(--primary); display: flex; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; }
+.nav button { flex: 1; padding: 12px 5px; border: none; background: none; color: rgba(255,255,255,0.7); cursor: pointer; text-align: center; }
+.nav button.active { color: #fff; border-bottom: 4px solid #fff; font-weight: bold; background: rgba(255,255,255,0.1); }
+.nav-icon { display: block; font-size: 20px; } .nav-text { font-size: 11px; display: block; }
+.page { display: none; } .page.active { display: block; }
+.box { background: white; padding: 20px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+select, input { width: 100%; padding: 10px; margin: 8px 0; border: 1.5px solid #eee; border-radius: 10px; box-sizing: border-box; font-size: 14px; min-height: 45px; -webkit-appearance: none; }
+.label { font-size: 12px; color: #777; font-weight: bold; margin-left: 5px; display: block; }
+.btn { width: 100%; background: var(--primary); color: white; border: none; padding: 16px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 16px; }
+table { width: 100%; border-collapse: collapse; background: white; border-radius: 16px; overflow: hidden; margin-top: 10px; }
+th, td { padding: 10px; text-align: left; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
+th { background: #f8f9fa; color: #666; }
+.sum-card { background: linear-gradient(135deg, #1a237e, #3949ab); color: white; text-align: center; padding: 20px; border-radius: 16px; margin-bottom: 15px; }
+.info-head { background: #e8eaf6; padding: 12px; border-radius: 10px; margin-bottom: 10px; border-left: 5px solid var(--primary); font-size: 13px; font-weight: bold; color: var(--primary); display: flex; justify-content: space-between; align-items: center; }
+.summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+.summary-item { padding: 10px; border-radius: 10px; text-align: center; font-weight: bold; }
+.action-group { display: flex; gap: 5px; }
+.btn-sm { padding: 8px 5px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 11px; flex: 1; text-align: center; }
+#editModal { display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height: 100%; background:rgba(0,0,0,0.5); }
+.modal-content { background:#fff; margin:10% auto; padding:20px; border-radius:16px; width:90%; max-width:400px; }
+.msg-box { display: none; text-align: center; padding: 20px; color: #d32f2f; background: #ffebee; border-radius: 12px; margin-top: 10px; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div id="loginOverlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:var(--primary); z-index:9999; display:flex; align-items:center; justify-content:center;">
+  <div class="box" style="width:90%; max-width:350px; text-align:center; padding:30px;">
+    <h3 style="margin-top:0; color:var(--primary);">ระบบบันทึกรายรับ-รายจ่าย</h3>
+    <p style="font-size:13px; color:#666;">กรุณากรอกรหัสผ่านเพื่อเข้าใช้งาน</p>
+    <input type="password" id="appPassword" placeholder="รหัสผ่าน" style="text-align:center; font-size:16px; margin-bottom:15px;">
+    <button class="btn" onclick="checkAppPassword()">เข้าสู่ระบบ</button>
+    <div id="loginErr" style="color:var(--danger); font-size:13px; margin-top:10px; display:none;">รหัสผ่านไม่ถูกต้อง!</div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="nav">
+    <button id="nav-f" class="active" onclick="go('f')"><span class="nav-icon">📝</span><span class="nav-text">บันทึก</span></button>
+    <button id="nav-v" onclick="go('v')"><span class="nav-icon">📊</span><span class="nav-text">สรุป</span></button>
+    <button id="nav-r" onclick="go('r')"><span class="nav-icon">📋</span><span class="nav-text">รายงาน</span></button>
+    <button id="nav-m" onclick="go('m')"><span class="nav-icon">⚙️</span><span class="nav-text">จัดการ</span></button>
+    <button onclick="logout()" style="color: #ff8a80;"><span class="nav-icon">🚪</span><span class="nav-text">ออกระบบ</span></button>
+  </div>
+
+  <div id="fPage" class="page active">
+    <div class="box">
+      <h3 style="text-align:center; margin-top:0;"> + เพิ่มรายการใหม่</h3>
+      <form id="mainForm" onsubmit="event.preventDefault(); save(this);">
+        <input type="hidden" name="editMode" value="false">
+        <span class="label">วันที่:</span><input type="date" id="today" name="date" required>
+        <span class="label">ประเภท:</span>
+        <select name="type">
+          <option value="รายจ่าย"> - รายจ่าย</option>
+          <option value="รายรับ"> + รายรับ</option>
+        </select>
+        <span class="label">รายการ:</span><select name="item" class="item-drop" required></select>
+        <span class="label">จำนวนเงิน:</span><input type="number" name="amount" placeholder="0.00" step="0.01" required>
+        <span class="label">หมายเหตุ:</span><input type="text" name="note" placeholder="หมายเหตุ">
+        <button type="submit" id="fBtn" class="btn">บันทึกข้อมูล</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="vPage" class="page">
+    <div class="box">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap:10px;">
+        <div>
+          <span class="label">จากเดือน:</span>
+          <select id="vMFrom">
+            <option value="all">ทุกเดือน</option><option value="0">ม.ค.</option><option value="1">ก.พ.</option><option value="2">มี.ค.</option><option value="3">เม.ย.</option><option value="4">พ.ค.</option><option value="5">มิ.ย.</option><option value="6">ก.ค.</option><option value="7">ส.ค.</option><option value="8">ก.ย.</option><option value="9">ต.ค.</option><option value="10">พ.ย.</option><option value="11">ธ.ค.</option>
+          </select>
+        </div>
+        <div>
+          <span class="label">ถึงเดือน:</span>
+          <select id="vMTo">
+            <option value="all">ทุกเดือน</option><option value="0">ม.ค.</option><option value="1">ก.พ.</option><option value="2">มี.ค.</option><option value="3">เม.ย.</option><option value="4">พ.ค.</option><option value="5">มิ.ย.</option><option value="6">ก.ค.</option><option value="7">ส.ค.</option><option value="8">ก.ย.</option><option value="9">ต.ค.</option><option value="10">พ.ย.</option><option value="11">ธ.ค.</option>
+          </select>
+        </div>
+      </div>
+      <div style="display: flex; gap:10px; margin-top:5px;">
+        <div style="flex:1;"><span class="label">ปี:</span><select id="vY" class="y-list"></select></div>
+        <div style="flex:1;"><span class="label">เลือกรายการ:</span><select id="vItem" class="item-drop"></select></div>
+      </div>
+      <button class="btn" style="margin-top:10px;" onclick="loadV()">วิเคราะห์สรุป</button>
+    </div>
+    <div id="vArea" style="display:none;">
+      <div id="vHead" class="info-head"></div>
+      <div class="sum-card"><div>คงเหลือสุทธิ</div><div style="font-size:32px; font-weight:bold;" id="vBal">0</div></div>
+      <div id="pChart" style="height:230px;"></div>
+      <div class="summary-grid">
+        <div class="summary-item" style="background:#e8f5e9; color:var(--success);">รายรับ<br><span id="vInc">0</span></div>
+        <div class="summary-item" style="background:#ffebee; color:var(--danger);">รายจ่าย<br><span id="vExp">0</span></div>
+      </div>
+      <div id="colChart" style="height:350px;"></div>
+      <table><thead><tr><th>รายการ</th><th style="text-align:right">ยอดรวม</th></tr></thead><tbody id="vBody"></tbody></table>
+    </div>
+    <div id="noMsgV" class="msg-box"></div>
+  </div>
+
+  <div id="rPage" class="page">
+    <div class="box">
+      <span class="label">เลือกรายการ:</span><select id="rItem" class="item-drop"></select>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:5px;">
+        <div>
+          <span class="label">จากเดือน:</span>
+          <select id="rMFrom">
+            <option value="all">ทุกเดือน</option><option value="0">ม.ค.</option><option value="1">ก.พ.</option><option value="2">มี.ค.</option><option value="3">เม.ย.</option><option value="4">พ.ค.</option><option value="5">มิ.ย.</option><option value="6">ก.ค.</option><option value="7">ส.ค.</option><option value="8">ก.ย.</option><option value="9">ต.ค.</option><option value="10">พ.ย.</option><option value="11">ธ.ค.</option>
+          </select>
+        </div>
+        <div>
+          <span class="label">ถึงเดือน:</span>
+          <select id="rMTo">
+            <option value="all">ทุกเดือน</option><option value="0">ม.ค.</option><option value="1">ก.พ.</option><option value="2">มี.ค.</option><option value="3">เม.ย.</option><option value="4">พ.ค.</option><option value="5">มิ.ย.</option><option value="6">ก.ค.</option><option value="7">ส.ค.</option><option value="8">ก.ย.</option><option value="9">ต.ค.</option><option value="10">พ.ย.</option><option value="11">ธ.ค.</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:5px;"><span class="label">ปี:</span><select id="rY" class="y-list"></select></div>
+      <button class="btn" style="background:#3949ab; margin-top:15px;" onclick="loadR()">ดึงรายงาน</button>
+    </div>
+    <div id="reportArea" style="display:none;">
+      <div id="rHeadWrap" class="info-head"><div id="rHead"></div><div id="rDetailAmt"></div></div>
+      <table><thead><tr><th>วันที่</th><th>รายการ</th><th>หมายเหตุ</th><th style="text-align:right">เงิน</th></tr></thead><tbody id="rBody"></tbody></table>
+    </div>
+    <div id="noMsgR" class="msg-box"></div>
+  </div>
+
+  <div id="mPage" class="page">
+    <div class="box" style="text-align:center;">
+      <button class="btn" style="background:#fff; color:var(--primary); border:1px solid var(--primary); padding: 10px;" onclick="toggleYearBox()"> + เพิ่มปีงบประมาณใหม่</button>
+      <div id="yearBox" style="display: none; margin-top:15px; border-top:1px dashed #ccc; padding-top:15px;">
+        <span class="label">ระบุปี ค.ศ. ที่ต้องการสร้าง:</span>
+        <input type="number" id="newYearInp" placeholder="เช่น 2027">
+        <button class="btn" style="background:var(--success);" onclick="addNewYear()">สร้างชีตใหม่</button>
+      </div>
+    </div>
+    <div class="box">
+      <div style="display: flex; gap:10px;">
+        <div style="flex:1;">
+          <span class="label">เดือน:</span>
+          <select id="mM">
+            <option value="all">ทุกเดือน</option><option value="0">ม.ค.</option><option value="1">ก.พ.</option><option value="2">มี.ค.</option><option value="3">เม.ย.</option><option value="4">พ.ค.</option><option value="5">มิ.ย.</option><option value="6">ก.ค.</option><option value="7">ส.ค.</option><option value="8">ก.ย.</option><option value="9">ต.ค.</option><option value="10">พ.ย.</option><option value="11">ธ.ค.</option>
+          </select>
+        </div>
+        <div style="flex:1;"><span class="label">ปี:</span><select id="mY" class="y-list"></select></div>
+      </div>
+      <button class="btn" style="background: #555; margin-top:10px;" onclick="loadM()">เรียกดูเพื่อจัดการ</button>
+    </div>
+    <div id="manageArea" style="display:none;">
+      <div id="mHead" class="info-head"></div>
+      <table><thead><tr><th>วันที่</th><th>รายการ</th><th>หมายเหตุ</th><th>เงิน</th><th style="text-align:center">จัดการ</th></tr></thead><tbody id="mBody"></tbody></table>
+    </div>
+    <div id="noMsgM" class="msg-box"></div>
+  </div>
+</div>
+
+<div id="editModal">
+  <div class="modal-content">
+    <h3 style="margin-top:0; text-align:center;"> แก้ไขรายการ</h3>
+    <form id="editForm" onsubmit="event.preventDefault(); updateSubmit(this);">
+      <input type="hidden" name="oldRow" id="eRow"><input type="hidden" name="oldYear" id="eYear">
+      <span class="label">วันที่:</span><input type="date" name="date" id="eDate" required>
+      <span class="label">ประเภท:</span><select name="type" id="eType"><option value="รายรับ">รายรับ</option><option value="รายจ่าย">รายจ่าย</option></select>
+      <span class="label">รายการ:</span><select name="item" id="eItem" class="item-drop" required></select>
+      <span class="label">จำนวนเงิน:</span><input type="number" name="amount" id="eAmt" step="0.01" required>
+      <span class="label">หมายเหตุ:</span><input type="text" name="note" id="eNote">
+      <div style="display: flex; gap:10px; margin-top:10px;">
+        <button type="submit" class="btn" style="background:var(--success); flex:2;">อัปเดต</button>
+        <button type="button" class="btn" style="background:#777; flex:1;" onclick="closeModal()">ยกเลิก</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+google.charts.load('current', {'packages': ['corechart', 'bar']});
+const mNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+window.onload = () => {
+  document.getElementById('today').value = new Date().toISOString().split('T')[0];
+};
+
+function checkAppPassword() {
+  const pwd = document.getElementById('appPassword').value;
+  const errDiv = document.getElementById('loginErr');
+  if(!pwd) return alert("กรุณากรอกรหัสผ่าน");
+  
+  google.script.run.withSuccessHandler(isValid => {
+    if(isValid) {
+      document.getElementById('loginOverlay').style.display = 'none';
+      updateYearLists(); 
+      updateItemDropdown();
+    } else {
+      errDiv.style.display = 'block';
+      document.getElementById('appPassword').value = '';
+    }
+  }).verifyPassword(pwd);
+}
+
+function go(p) {
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(el => el.classList.remove('active'));
+  document.getElementById(p + 'Page').classList.add('active');
+  document.getElementById('nav-' + p).classList.add('active');
+}
+
+function updateYearLists() {
+  google.script.run.withSuccessHandler(years => {
+    const html = years.map(y => `<option value="${y}">${y}</option>`).join('') + '<option value="all">ทุกปี</option>';
+    document.querySelectorAll('.y-list').forEach(s => s.innerHTML = html);
+  }).getYearLists();
+}
+
+function updateItemDropdown() {
+  const items = [
+    "เงินเดือนประจำ", "ค่าเบี้ยเลี้ยง", "ค่าเสี่ยงภัย", "ค่ารับเวร", "ค่าอาหาร", 
+    "ค่าน้ำประปา", "ค่าไฟบ้าน", "ค่าบัตรเครดิต", "ลงทุน", "ให้เมียเก็บ", 
+    "ของใช้ในบ้าน", "จิปาถะ", "อื่นๆ", "ค่าของทำน้ำขาย", "จ่ายหนี้ค่าติด", 
+    "ค่าประกัน", "ค่าโทรศัพท์", "ชำระเงินกู้", "ค่าน้ำมัน", "ค่าทำบุญ", 
+    "ค่าปันผลสหกรณ์ตำรวจ", "ค่าปันผลร้านน้ำ", "เงินขายน้ำ", "ค่าปันผลร้านรองเท้า"
+  ];
+  const htmlItems = items.map(i => `<option value="${i}">${i}</option>`).join('');
+  document.querySelectorAll('.item-drop').forEach(s => {
+    s.innerHTML = (s.id === 'rItem' || s.id === 'vItem' ? '<option value="ทั้งหมด">ทั้งหมด</option>' : '') + htmlItems;
+  });
+}
+
+function save(form) {
+  const btn = document.getElementById('fBtn'); btn.disabled = true; btn.innerText = "กำลังบันทึก...";
+  google.script.run.withSuccessHandler(res => { 
+    alert(res); form.reset(); btn.disabled = false; btn.innerText = "บันทึกข้อมูล"; 
+    document.getElementById('today').value = new Date().toISOString().split('T')[0]; 
+  }).processForm(form);
+}
+
+function loadV() {
+  const mFrom = document.getElementById('vMFrom').value;
+  const mTo = document.getElementById('vMTo').value;
+  const y = document.getElementById('vY').value;
+  const item = document.getElementById('vItem').value;
+
+  if (mFrom !== 'all' && mTo !== 'all' && parseInt(mFrom) > parseInt(mTo)) {
+    alert("กรุณาเลือกช่วงเดือนให้ถูกต้อง (เดือนเริ่มต้นต้องไม่มากกว่าเดือนสิ้นสุด)");
+    return;
+  }
+
+  google.script.run.withSuccessHandler(res => {
+    const area = document.getElementById('vArea'), msg = document.getElementById('noMsgV');
+    if (!res.summaryData || res.summaryData.length === 0) { 
+      area.style.display = 'none'; msg.style.display = 'block'; 
+      var mTxt = (mFrom === 'all' || mTo === 'all') ? 'ทุกเดือน' : `${mNames[mFrom]} - ${mNames[mTo]}`;
+      msg.innerHTML = `ไม่พบข้อมูลของ: <b>${mTxt} ปี ${y}</b> (${item})`; return; 
+    }
+    msg.style.display = 'none'; area.style.display = 'block';
+    var headTxt = (mFrom === 'all' || mTo === 'all') ? 'ทุกเดือน' : `${mNames[mFrom]} - ${mNames[mTo]}`;
+    document.getElementById('vHead').innerHTML = `ข้อมูลของ: ${headTxt} ปี ${y} (${item})`;
+    document.getElementById('vBal').innerText = (res.income - res.expense).toLocaleString();
+    document.getElementById('vInc').innerText = res.income.toLocaleString();
+    document.getElementById('vExp').innerText = res.expense.toLocaleString();
+    document.getElementById('vBody').innerHTML = res.summaryData.map(s => 
+      `<tr><td>${s.name}</td><td style="text-align:right; color:${s.type === 'รายรับ' ? 'green' : 'red'}">${s.amount.toLocaleString()}</td></tr>`).join('');
+    drawCharts(res.income, res.expense, res.summaryData);
+  }).getGroupSummaryRange(mFrom, mTo, y, item);
+}
+
+function drawCharts(inc, exp, summary) {
+  new google.visualization.PieChart(document.getElementById('pChart')).draw(google.visualization.arrayToDataTable([['Type', 'Amt'], ['รายรับ', inc], ['รายจ่าย', exp]]), { pieHole: 0.4, colors: ['#2e7d32', '#c62828'], chartArea:{width:'90%',height:'80%'}, legend:'bottom' });
+  const barData = [['รายการ', 'เงิน', { role: 'style' }, { role: 'annotation' }]];
+  const colors = ['#3949ab', '#66bb6a', '#ffa726', '#ef5350', '#26c6da', '#ab47bc'];
+  summary.forEach((s, idx) => barData.push([s.name, s.amount, colors[idx % colors.length], s.amount.toLocaleString()]));
+  new google.visualization.ColumnChart(document.getElementById('colChart')).draw(google.visualization.arrayToDataTable(barData), { legend:'none', chartArea:{width:'80%', height:'70%'} });
+}
+
+function loadR() {
+  const item = document.getElementById('rItem').value;
+  const mFrom = document.getElementById('rMFrom').value;
+  const mTo = document.getElementById('rMTo').value;
+  const y = document.getElementById('rY').value;
+
+  if (mFrom !== 'all' && mTo !== 'all' && parseInt(mFrom) > parseInt(mTo)) {
+    alert("กรุณาเลือกช่วงเดือนให้ถูกต้อง");
+    return;
+  }
+
+  google.script.run.withSuccessHandler(data => {
+    const area = document.getElementById('reportArea'), msg = document.getElementById('noMsgR');
+    var mTxt = (mFrom === 'all' || mTo === 'all') ? 'ทุกเดือน' : `${mNames[mFrom]} - ${mNames[mTo]}`;
+    if (!data || data.length === 0) { area.style.display = 'none'; msg.style.display = 'block'; msg.innerHTML = `ไม่พบข้อมูลของ: <b>${mTxt} ปี ${y}</b> (${item})`; return; }
+    msg.style.display = 'none'; area.style.display = 'block';
+    document.getElementById('rHead').innerText = `ข้อมูล ${item} (${mTxt} ${y})`;
+    let inc = 0, exp = 0;
+    document.getElementById('rBody').innerHTML = data.map(r => { 
+      if(r.type === 'รายรับ') inc += r.amount; else exp += r.amount;
+      return `<tr><td>${r.date}</td><td>${r.item}</td><td>${r.note}</td><td style="text-align:right; color:${r.type === 'รายรับ' ? 'green' : 'red'}">${r.amount.toLocaleString()}</td></tr>`; 
+    }).join('');
+    document.getElementById('rDetailAmt').innerHTML = `<span style="color:green">รับ: ${inc.toLocaleString()}</span> | <span style="color:red">จ่าย: ${exp.toLocaleString()}</span><br><b>สุทธิ: ${(inc - exp).toLocaleString()}</b>`;
+  }).getFilterByItemRange(item, mFrom, mTo, y);
+}
+
+function loadM() {
+  const m = document.getElementById('mM').value, y = document.getElementById('mY').value;
+  google.script.run.withSuccessHandler(data => {
+    const area = document.getElementById('manageArea'), msg = document.getElementById('noMsgM');
+    if (!data || data.length === 0) { area.style.display = 'none'; msg.style.display = 'block'; msg.innerHTML = `ไม่พบข้อมูลของ: <b>${m === 'all' ? 'ทุกเดือน' : mNames[m]} ปี ${y}</b>`; return; }
+    msg.style.display = 'none'; area.style.display = 'block';
+    document.getElementById('mHead').innerHTML = `จัดการข้อมูลของ: ${m === 'all' ? 'ทุกเดือน' : mNames[m]} ปี ${y}`;
+    document.getElementById('mBody').innerHTML = data.map(r => `
+      <tr>
+        <td>${r.date}</td><td>${r.item}</td><td>${r.note}</td><td style="color:${r.type === 'รายรับ' ? 'green' : 'red'}">${r.amount.toLocaleString()}</td>
+        <td>
+          <div class="action-group">
+            <button class="btn-sm" style="background:var(--edit)" onclick='openEdit(${JSON.stringify(r)})'>แก้</button>
+            <button class="btn-sm" style="background:var(--danger)" onclick="delRow('${r.row}','${r.year}')">ลบ</button>
+          </div>
+        </td>
+      </tr>`).join('');
+  }).getRawData(m, y);
+}
+
+function openEdit(r) {
+  document.getElementById('eRow').value = r.row;
+  document.getElementById('eYear').value = r.year;
+  if (r.rawDate) { document.getElementById('eDate').value = Array.isArray(r.rawDate) ? r.rawDate[0] : r.rawDate.split('T')[0]; }
+  document.getElementById('eType').value = r.type;
+  document.getElementById('eItem').value = r.item;
+  document.getElementById('eAmt').value = r.amount;
+  document.getElementById('eNote').value = r.note;
+  document.getElementById('editModal').style.display = 'block';
+}
+function closeModal() { document.getElementById('editModal').style.display = 'none'; }
+function updateSubmit(form) { google.script.run.withSuccessHandler(res => { alert(res); closeModal(); loadM(); }).updateRow(Object.fromEntries(new FormData(form))); }
+function delRow(r, y) { if(confirm('ยืนยันการลบรายการนี้?')) google.script.run.withSuccessHandler(res => { alert(res); loadM(); }).deleteRow(r,y); }
+function toggleYearBox() { const b = document.getElementById('yearBox'); b.style.display = (b.style.display === 'none') ? 'block' : 'none'; }
+function addNewYear() {
+  const year = document.getElementById('newYearInp').value;
+  if (!year || year.length < 4) return alert('กรุณาระบุปีให้ถูกต้อง');
+  google.script.run.withSuccessHandler(res => { alert(res); updateYearLists(); toggleYearBox(); document.getElementById('newYearInp').value = ''; }).createNewYear(year);
+}
+</script>
+</body>
+</html>
